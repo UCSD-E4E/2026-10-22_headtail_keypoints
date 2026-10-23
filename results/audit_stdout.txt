@@ -1,7 +1,3 @@
-headtail-keypoints devShell — uv uv 0.11.15 (x86_64-unknown-linux-gnu), Python 3.13.13
-venv: /local/c.crutchfield.642/.cache/uv-venvs/2026-10-22_headtail_keypoints
-First time / after rebuild:  uv sync
-Verify torch+driver:         uv run python -c 'import torch, cv2; print(torch.__version__, torch.cuda.is_available())'
 analysis repo commit: d9c1b80
 
 == head/tail annotations by (seeded, origins)
