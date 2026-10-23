@@ -95,7 +95,10 @@ def main():
         sam() if which == "sam" else train_val(which)
     (hk.YOLO / "data.yaml").write_text(
         f"path: {hk.YOLO}\ntrain: images/train\nval: images/val\nnames:\n  0: fish\nkpt_shape: [2, 3]\n"
-        "flip_idx: [0, 1]   # snout and fork are not a left/right pair: a flip keeps their identity\n")
+        "flip_idx: [0, 1]   # snout and fork are not a left/right pair: a flip keeps their identity\n"
+        "# OKS sigmas for the keypoint loss. Ultralytics defaults to 1/n_kpt = 0.5 for a custom skeleton, 5-20x COCO's\n"
+        "# (0.025-0.107): a point 10% of the fish off was barely penalised and training plateaued at ~10% snout error.\n"
+        "kpt_oks_sigmas: [0.025, 0.025]\n")
 
 
 if __name__ == "__main__":
