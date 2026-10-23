@@ -12,6 +12,11 @@ agreement with the human pipeline).
     uv sync
     export CSCW_REPO=/path/to/cscw-fishsense2027   # default ../cscw-fishsense2027
 
+The restored DB runs locally as container `p2-fishsense-db` (postgres:17, dump
+`database_backups_v2/fishsense/2026-10-22T03-00-00Z.dump`). The committed extracts in the analysis
+repo come from the 2026-09-25 dump; the newer dump adds 9 head/tail annotations, all on dive 347
+(a test dive), and 3 pixel rows. The audit and split use the committed extracts.
+
 ## Step 1: data audit (CPU only)
 
     uv run python scripts/audit.py > results/audit_stdout.txt
@@ -30,3 +35,20 @@ and `splits/frames.csv` (one row per eligible image, with the human clicks in la
 
 `sql/extract_headtail_canvas.sql` gets the label canvas size per annotation. It is still pending,
 because it has to run where the restored DB lives.
+
+**Frame and canvas, settled.** The head/tail labelling JPEG is
+`RectifiedImage(RawImage(raw), intrinsics)` (fishsense-services
+`headtail_preprocess/activities.py`). `cv2.undistort` keeps the camera matrix and the image size, and
+the decoded frame is 4014×3016. That is the canvas of every head/tail annotation that has points
+(`sql/extract_headtail_canvas.sql`: 27,486 annotations at 4014×3016; the 3987 canvas occurs only on
+laser labels). The clicks are therefore rectified pixels and need no rescaling.
+
+## Step 2: staging (CPU + NAS)
+
+    docker exec -i ... < sql/extract_image_paths.sql > data/private/image_paths.psv   # private: paths hold names
+    uv run python scripts/stage.py --workers 24
+
+Test and val frames are stored whole. Training frames are stored as a full-resolution crop around
+the clicks plus a quarter-scale frame: about 51 GB in all, under `/local`. The decode takes about 5 s
+for a single process. With many workers, transparent-hugepage compaction made it about 5x slower,
+so each worker disables THP for itself (`prctl`).

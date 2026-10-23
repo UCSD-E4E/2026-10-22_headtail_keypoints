@@ -8,4 +8,9 @@ dependencies = [
     "numpy>=2.3",
     "pandas>=2.3",
     "opencv-python-headless>=4.12",
+    "fishsense-core==4.1.0",
 ]
+
+[tool.uv.sources]
+# the version fishsense-services-processor pins (pyproject.toml there), so crops decode and rectify as labellers saw them
+fishsense-core = { url = "https://github.com/UCSD-E4E/fishsense-core/releases/download/fishsense-core-v4.1.0/fishsense_core-4.1.0-cp313-cp313-manylinux_2_34_x86_64.whl" }
