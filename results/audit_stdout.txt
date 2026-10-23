@@ -1,9 +1,8 @@
-warning: Git tree '/scratch/krg/c.crutchfield.642/Repos/school/e4e/fishsense/2026-10-22_fish_head_tail_detector' is dirty
 headtail-keypoints devShell — uv uv 0.11.15 (x86_64-unknown-linux-gnu), Python 3.13.13
 venv: /local/c.crutchfield.642/.cache/uv-venvs/2026-10-22_headtail_keypoints
 First time / after rebuild:  uv sync
 Verify torch+driver:         uv run python -c 'import torch, cv2; print(torch.__version__, torch.cuda.is_available())'
-analysis repo: /tmp/claude-751001103/-scratch-krg-c-crutchfield-642-Repos-school-e4e-fishsense-2026-10-22-fish-head-tail-detector/c1dabccf-45c6-451b-9320-df0d04845164/scratchpad/cscw-fishsense2027
+analysis repo commit: d9c1b80
 
 == head/tail annotations by (seeded, origins)
 seeded  origins                      

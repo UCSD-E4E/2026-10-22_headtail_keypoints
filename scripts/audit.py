@@ -143,7 +143,9 @@ def main():
     per, H = image_table()
     pd.set_option("display.width", 200); pd.set_option("display.max_rows", 200)
 
-    print(f"analysis repo: {CSCW}")
+    import subprocess
+    rev = subprocess.run(["git", "-C", str(CSCW), "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
+    print(f"analysis repo commit: {rev or 'unknown'}")
     print("\n== head/tail annotations by (seeded, origins)")
     print(H.groupby(["seeded", "origins"]).size().rename("annotations").to_string())
     print("\n== images")
