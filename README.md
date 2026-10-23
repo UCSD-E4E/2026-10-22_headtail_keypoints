@@ -33,8 +33,6 @@ and `splits/frames.csv` (one row per eligible image, with the human clicks in la
   (10%), drawn with seed 0. Checkpoints are selected on the head-tail pixel-length ratio, which
   equals the length ratio at a fixed depth, so the validation dives need no calibration.
 
-`sql/extract_headtail_canvas.sql` gets the label canvas size per annotation. It is still pending,
-because it has to run where the restored DB lives.
 
 **Frame and canvas, settled.** The head/tail labelling JPEG is
 `RectifiedImage(RawImage(raw), intrinsics)` (fishsense-services
