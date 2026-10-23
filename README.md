@@ -53,3 +53,20 @@ Test and val frames are stored whole. Training frames are stored as a full-resol
 the clicks plus a quarter-scale frame: about 51 GB in all, under `/local`. The decode takes about 5 s
 for a single process. With many workers, transparent-hugepage compaction made it about 5x slower,
 so each worker disables THP for itself (`prctl`).
+
+## Step 3: training (model choice, recorded before any test-set prediction)
+
+- **YOLO-pose was tried first and dropped.** Its OKS keypoint loss did not fit two precise points.
+  With Ultralytics' default sigma for a custom skeleton (0.5), validation plateaued at a mean |d| of
+  about 22%, with a snout error of about 10% of length. With a COCO-like sigma (0.025), it did not
+  learn orientation: 52% of frames were swapped. The per-epoch numbers are in
+  `results/train_{full,sigma}_length_val.csv`.
+- **The model is `scripts/kpnet.py`:** a top-down SimCC model in the RTMPose design. It uses a
+  ConvNeXt-Tiny backbone, a 512-px crop of the fish under the laser dot, and a SimCC head with
+  half-pixel bins.
+- **Selection rule, fixed on 2026-10-22 before any test prediction:** the final model is the
+  checkpoint with the lowest mean |d| on the validation-dive SAM-box crops. It is drawn from two
+  runs, `simcc_click` (click-centred training crops) and `simcc_sam` (SAM-box training crops where
+  available). Each run keeps its own best epoch (`best_length.pt`). The run with the lower
+  validation mean |d| is the model. It is then run once on the test dives, and that test number is
+  reported whatever it is.

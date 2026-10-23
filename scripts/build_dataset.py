@@ -91,12 +91,17 @@ def train_val(which: str):
             x0, y0, x1, y1 = hk.square_crop(0.5 * (r.head_x + r.tail_x), 0.5 * (r.head_y + r.tail_y), L, W, H)
             cv2.imwrite(str(img / f"{r.image_id}.jpg"), frame[y0:y1, x0:x1])
         w, h = x1 - x0, y1 - y0
+        kx, ky = np.array([r.head_x, r.tail_x]) - x0, np.array([r.head_y, r.tail_y]) - y0
+        if not ((kx > 0) & (kx < w) & (ky > 0) & (ky < h)).all():   # the box missed part of the fish: a clipped label is wrong
+            (img / f"{r.image_id}.jpg").unlink(missing_ok=True)
+            rec.append(dict(image_id=r.image_id, source="dropped: keypoint outside crop", padded=np.nan)); continue
         (lab / f"{r.image_id}.txt").write_text(hk.yolo_label(w, h, r.head_x - x0, r.head_y - y0, r.tail_x - x0, r.tail_y - y0) + "\n")
     msg = f"{which}: {len(F)} crops from {F.dive_id.nunique()} dives"
     if rec:
         R = pd.DataFrame(rec); R.to_csv(hk.HERE / f"results/{sub}_crops.csv", index=False, float_format="%.4f")
-        sb = R[R.source == "sam_box"]
-        msg += f"; {len(sb)} cut by SAM box ({(sb.padded > 0).mean():.1%} padded, median pad {sb.padded[sb.padded > 0].median():.1%}), {len(R) - len(sb)} click-centred"
+        R = R.drop_duplicates("image_id", keep="last"); R.to_csv(hk.HERE / f"results/{sub}_crops.csv", index=False, float_format="%.4f")
+        sb = R[R.source == "sam_box"]; nd = int(R.source.str.startswith("dropped").sum())
+        msg += f"; {nd} dropped (keypoint outside the crop); {len(sb)} cut by SAM box ({(sb.padded > 0).mean():.1%} padded, median pad {sb.padded[sb.padded > 0].median():.1%}), {len(R) - len(sb) - nd} click-centred"
     print(msg)
 
 
