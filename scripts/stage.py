@@ -108,9 +108,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--frames", default="splits/frames.csv", help="frame list (splits/eval_extra.csv for the extra test frames)")
     a = ap.parse_args()
     STAGE.mkdir(parents=True, exist_ok=True); LOG.parent.mkdir(exist_ok=True)
-    F = pd.read_csv(HERE / "splits/frames.csv")
+    F = pd.read_csv(HERE / a.frames)
     P = pd.read_csv(HERE / "data/private/image_paths.psv", sep="|", header=None,
                     names=["image_id", "dive_id", "camera_id", "checksum", "dive_path", "path"]).set_index("image_id")
     F = order(F)
