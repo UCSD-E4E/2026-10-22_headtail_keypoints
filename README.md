@@ -70,3 +70,6 @@ so each worker disables THP for itself (`prctl`).
   available). Each run keeps its own best epoch (`best_length.pt`). The run with the lower
   validation mean |d| is the model. It is then run once on the test dives, and that test number is
   reported whatever it is.
+- **Selected (2026-10-22, before any test prediction):** `simcc_sam`, epoch 12, with a validation
+  mean |d| of 2.67% (median 1.07%, 95.1% within 10%). `simcc_click` reached 3.13% at epoch 7.
+  The SAM rule on the same validation crops: 6.17% (median 2.71%, 79.0% within 10%).
