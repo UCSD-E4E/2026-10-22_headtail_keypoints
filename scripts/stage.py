@@ -1,10 +1,13 @@
 """Step 2 staging (CPU + NAS only; the GPU is hidden): every eligible frame decoded and rectified once.
 
-Each frame of splits/frames.csv is read from the NAS, decoded with fishsense-core's production
-decode (`DecodeConfig.production()`, as the deployed pipeline feeds SAM) and rectified with its
-camera's intrinsics (laser_detection_analysis/intrinsics.csv in the analysis repo): the same
-`RectifiedImage(RawImage(raw), intrinsics)` the head/tail labelling JPEGs come from
-(fishsense-services headtail_preprocess/activities.py), so the stored clicks are in its pixel frame.
+Each frame of splits/frames.csv is read from the NAS, decoded with fishsense-core's DEFAULT decode
+(`RawImage(raw)`, i.e. `DecodeConfig()`) and rectified with its camera's intrinsics
+(laser_detection_analysis/intrinsics.csv in the analysis repo). That is exactly production's
+head/tail stage (fishsense-services headtail_preprocess/activities.py:
+`RectifiedImage(RawImage(raw_bytes), intrinsics)`): the JPEG labellers click on and SAM 3.1 reads,
+so the clicks are in its pixel frame and the model sees what the SAM rule sees. (Not
+`DecodeConfig.production()`, which adds CLAHE; a first staging pass used it by mistake and was
+discarded: results/stage_log_clahe_decode_discarded.jsonl.)
 Written at OpenCV's default JPEG quality, the encoder production uses. The decode (~15 s per
 frame) is the cost, so it is done once:
   test, val  the full-resolution frame (<id>.jpg), so crops can follow the detector's box later
@@ -82,7 +85,7 @@ def stage_one(image_id: int, split: str, path: str, camera_matrix, dist, clicks)
     rec, t0 = dict(image_id=int(image_id), split=split), time.time()
     try:
         raw = (NAS / path).read_bytes()
-        img = RectifiedImage(RawImage(raw, config=DecodeConfig.production()),
+        img = RectifiedImage(RawImage(raw, config=DecodeConfig()),
                              CameraIntrinsics(camera_matrix=camera_matrix, distortion_coefficients=dist)).data
         H, W = img.shape[:2]; rec.update(h=int(H), w=int(W))
         if split != "train":

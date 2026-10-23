@@ -46,6 +46,9 @@ laser labels). The clicks are therefore rectified pixels and need no rescaling.
     docker exec -i ... < sql/extract_image_paths.sql > data/private/image_paths.psv   # private: paths hold names
     uv run python scripts/stage.py --workers 24
 
+Decode: fishsense-core's default `RawImage(raw)`, as production's head/tail stage, not
+`DecodeConfig.production()` (CLAHE).
+
 Test and val frames are stored whole. Training frames are stored as a full-resolution crop around
 the clicks plus a quarter-scale frame: about 51 GB in all, under `/local`. The decode takes about 5 s
 for a single process. With many workers, transparent-hugepage compaction made it about 5x slower,
