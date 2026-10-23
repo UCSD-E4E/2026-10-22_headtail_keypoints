@@ -34,11 +34,19 @@ def selection_set() -> pd.DataFrame:
     return C.merge(F, on="image_id")
 
 
-def predict_frames(model, C: pd.DataFrame, imgsz: int, batch: int = 32, device=None) -> pd.DataFrame:
+def predict_frames(model, C: pd.DataFrame, imgsz: int, batch: int = 16, device=None) -> pd.DataFrame:
     """Model keypoints in frame pixels for each crop of C (columns pred_head_x.. , pred_conf; NaN if none)."""
+    import torch
     paths = [str(hk.YOLO / "sam" / f"{n}.jpg") for n in C.name]
+    results = []
+    for j in range(0, len(paths), batch):   # chunked by hand: given the whole list, the predictor warmed up on it as one batch (OOM)
+        results += [(r.boxes.cpu(), r.keypoints.cpu()) for r in model.predict(paths[j:j + batch], imgsz=imgsz, batch=batch, conf=0.01,
+                                                                                verbose=False, device=device)]
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     out = []
-    for i, res in enumerate(model.predict(paths, imgsz=imgsz, batch=batch, conf=0.01, stream=True, verbose=False, device=device)):
+    for i, (boxes, kps) in enumerate(results):
+        res = type("R", (), {"boxes": boxes, "keypoints": kps})
         r = C.iloc[i]
         k = hk.pick(res, (r.dot_x - r.crop_x0, r.dot_y - r.crop_y0))
         out.append(dict(pred_head_x=np.nan, pred_head_y=np.nan, pred_tail_x=np.nan, pred_tail_y=np.nan, pred_conf=np.nan) if k is None else
@@ -64,6 +72,8 @@ def main():
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--fraction", type=float, default=1.0)
     ap.add_argument("--gpu", default="0")
+    ap.add_argument("--workers", type=int, default=16)
+    ap.add_argument("--val", action="store_true", help="also run Ultralytics' own validation (pose mAP) each epoch; selection never uses it")
     a = ap.parse_args()
     from ultralytics import YOLO
 
@@ -90,7 +100,7 @@ def main():
     model.train(data=str(hk.YOLO / "data.yaml"), epochs=a.epochs, imgsz=a.imgsz, batch=a.batch, device=int(a.gpu),
                 project=str(hk.DATA / "runs"), name=a.name, exist_ok=True, fraction=a.fraction, seed=0, deterministic=True,
                 mosaic=0.0, close_mosaic=0, fliplr=0.5, flipud=0.5, degrees=30, scale=0.3, translate=0.1,
-                cos_lr=True, workers=8, plots=False, val=True)
+                cos_lr=True, workers=a.workers, plots=False, val=a.val)
 
 
 if __name__ == "__main__":
