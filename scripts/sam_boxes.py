@@ -18,6 +18,7 @@ Run: $SAM_PY scripts/sam_boxes.py [--gpu N] [--limit N] [--splits test,val]
 """
 from __future__ import annotations
 
+import ctypes
 import argparse
 import hashlib
 import json
@@ -28,6 +29,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+# PR_SET_THP_DISABLE: on this shared host, transparent-hugepage compaction made each job ~100x slower
+# (system time, not GPU); torch's CPU pools capped for the same reason.
+ctypes.CDLL(None).prctl(41, 1, 0, 0, 0)
+for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+    os.environ.setdefault(_v, "8")
 
 HERE = Path(__file__).resolve().parents[1]
 CSCW = Path(os.environ.get("CSCW_REPO", HERE.parent / "cscw-fishsense2027")).resolve()

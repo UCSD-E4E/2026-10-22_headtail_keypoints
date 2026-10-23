@@ -30,7 +30,8 @@ LOG = hk.HERE / "results/stage_log.jsonl"
 
 def staged() -> pd.DataFrame:
     L = pd.DataFrame([json.loads(l) for l in LOG.open()])
-    return L[L.get("error").isna()] if "error" in L else L
+    L = L[L.get("error").isna()] if "error" in L else L
+    return L.drop_duplicates("image_id", keep="last")   # two staging runs overlapped on some frames; same bytes either way
 
 
 def train_val(which: str):
@@ -57,22 +58,34 @@ def train_val(which: str):
     print(f"{which}: {n} crops from {F.dive_id.nunique()} dives")
 
 
-def sam():
+def _crop_frame(args):
+    """All SAM-box crops of one frame (worker process)."""
+    import ctypes
+    ctypes.CDLL(None).prctl(41, 1, 0, 0, 0)   # PR_SET_THP_DISABLE: hugepage compaction made big-JPEG decoding crawl here
+    cv2.setNumThreads(1)
+    image_id, recs = args
+    frame = cv2.imread(str(hk.STAGE / f"{image_id}.jpg")); H, W = frame.shape[:2]
+    rows = []
+    for r in recs:
+        x0, y0, x1, y1 = hk.crop_from_box(r["mask_bbox"], W, H)
+        name = f"{image_id}_{r['seed']}"
+        cv2.imwrite(str(hk.YOLO / "sam" / f"{name}.jpg"), frame[y0:y1, x0:x1])
+        rows.append(dict(name=name, image_id=image_id, split=r["split"], seed=r["seed"], crop_x0=x0, crop_y0=y0, crop_x1=x1, crop_y1=y1,
+                         dot_x=r["dot_x"], dot_y=r["dot_y"], sam_head_x=r["head_x"], sam_head_y=r["head_y"], sam_tail_x=r["tail_x"],
+                         sam_tail_y=r["tail_y"], sam_status=r["status"]))
+    return rows
+
+
+def sam(workers: int = 16):
+    from concurrent.futures import ProcessPoolExecutor
+    import multiprocessing as mp
     B = pd.DataFrame([json.loads(l) for l in (hk.HERE / "results/sam_boxes.jsonl").open()]).drop_duplicates(["image_id", "seed"], keep="last")
     B = B[B.mask_bbox.notna()]
     out = hk.YOLO / "sam"; shutil.rmtree(out, ignore_errors=True); out.mkdir(parents=True)
-    rows, cache = [], {}
-    for r in B.sort_values("image_id").itertuples():
-        if r.image_id not in cache:
-            cache.clear(); cache[r.image_id] = cv2.imread(str(hk.STAGE / f"{r.image_id}.jpg"))
-        frame = cache[r.image_id]; H, W = frame.shape[:2]
-        x0, y0, x1, y1 = hk.crop_from_box(r.mask_bbox, W, H)
-        name = f"{r.image_id}_{r.seed}"
-        cv2.imwrite(str(out / f"{name}.jpg"), frame[y0:y1, x0:x1])
-        rows.append(dict(name=name, image_id=r.image_id, split=r.split, seed=r.seed, crop_x0=x0, crop_y0=y0, crop_x1=x1, crop_y1=y1,
-                         dot_x=r.dot_x, dot_y=r.dot_y, sam_head_x=r.head_x, sam_head_y=r.head_y, sam_tail_x=r.tail_x, sam_tail_y=r.tail_y,
-                         sam_status=r.status))
-    C = pd.DataFrame(rows); C.to_csv(hk.HERE / "results/sam_crops.csv", index=False)
+    jobs = [(int(i), g.to_dict("records")) for i, g in B.groupby("image_id")]
+    with ProcessPoolExecutor(workers, mp_context=mp.get_context("spawn")) as ex:
+        rows = [r for rs in ex.map(_crop_frame, jobs, chunksize=8) for r in rs]
+    C = pd.DataFrame(rows).sort_values(["split", "image_id", "seed"]); C.to_csv(hk.HERE / "results/sam_crops.csv", index=False)
     print("sam crops:", C.groupby(["split", "seed"]).size().to_dict())
 
 
