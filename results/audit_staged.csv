@@ -1,0 +1,4 @@
+split,tail_stage,sam_windows,eligible
+test,906,181,1287
+train,0,15,19980
+val,187,0,3517

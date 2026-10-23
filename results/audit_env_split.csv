@@ -1,0 +1,5 @@
+environment,test,train,val,All
+other,0,934,78,1012
+pool,877,34,72,983
+reef,410,19012,3367,22789
+All,1287,19980,3517,24784

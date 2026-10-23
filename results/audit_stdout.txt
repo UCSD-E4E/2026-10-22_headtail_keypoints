@@ -1,0 +1,138 @@
+warning: Git tree '/scratch/krg/c.crutchfield.642/Repos/school/e4e/fishsense/2026-10-22_fish_head_tail_detector' is dirty
+headtail-keypoints devShell — uv uv 0.11.15 (x86_64-unknown-linux-gnu), Python 3.13.13
+venv: /local/c.crutchfield.642/.cache/uv-venvs/2026-10-22_headtail_keypoints
+First time / after rebuild:  uv sync
+Verify torch+driver:         uv run python -c 'import torch, cv2; print(torch.__version__, torch.cuda.is_available())'
+analysis repo: /tmp/claude-751001103/-scratch-krg-c-crutchfield-642-Repos-school-e4e-fishsense-2026-10-22-fish-head-tail-detector/c1dabccf-45c6-451b-9320-df0d04845164/scratchpad/cscw-fishsense2027
+
+== head/tail annotations by (seeded, origins)
+seeded  origins                      
+False                                    13012
+        manual                           25726
+        prediction                           1
+        prediction+prediction-changed        1
+        prediction-changed                   4
+True    prediction                         504
+        prediction+prediction-changed     1024
+        prediction-changed                 200
+
+== images
+images with a head/tail annotation                                   40446
+ with >=1 unseeded all-manual annotation                             25711
+  ... of which also have a seeded/prediction annotation (dropped)        0
+  ... of which have no head/tail pixel row (dropped)                   321
+  ... of which are non-fish targets (Box, checkerboard; dropped)       606
+eligible images (unseeded manual, with coordinates)                  24784
+ eligible images labelled by >1 annotator                               12
+dives with eligible images                                             182
+images with only empty-result annotations                            13001
+  ... of which nonetheless have pixel coords                            26
+
+== eligible images by environment x split
+split        test  train   val    All
+environment                          
+other           0    934    78   1012
+pool          877     34    72    983
+reef          410  19012  3367  22789
+All          1287  19980  3517  24784
+
+== dives by environment x split
+split        test  train  val  All
+environment                       
+other           0     11    3   14
+pool           17     13    6   36
+reef            8    106   25  139
+All            25    130   34  189
+
+== test dives (all must be held out)
+ dive_id environment  n_frames split                 role
+      58        pool        25  test pool fish-model dive
+      59        pool        86  test pool fish-model dive
+      60        pool       103  test pool fish-model dive
+      61        pool        69  test pool fish-model dive
+      62        pool         0  test   pool slate session
+      63        pool         0  test   pool slate session
+      65        pool         0  test   pool slate session
+      66        pool        51  test pool fish-model dive
+      71        pool         0  test   pool slate session
+      76        pool        91  test pool fish-model dive
+      77        pool         0  test   pool slate session
+      80        pool         0  test   pool slate session
+      83        pool         0  test   pool slate session
+      84        pool        60  test pool fish-model dive
+      87        pool       375  test pool fish-model dive
+      94        pool         6  test pool fish-model dive
+     114        pool        11  test pool fish-model dive
+     279        reef        53  test    reef (calibrated)
+     341        reef        89  test    reef (calibrated)
+     347        reef       121  test    reef (calibrated)
+     349        reef        50  test    reef (calibrated)
+     383        reef        19  test    reef (calibrated)
+     436        reef         1  test    reef (calibrated)
+     465        reef        48  test    reef (calibrated)
+     471        reef        29  test    reef (calibrated)
+
+== eligible images by species x split
+split                  test  train   val  total
+species                                        
+(no species label)      125  19848  3444  23417
+model: Snook            507     12     0    519
+Hogfish                 109     22     3    134
+model: Grouper          133      0     0    133
+model: Purple Angel     102     19     0    121
+model: Shark             98      0     0     98
+model: Weasly Fish        0     28    68     96
+Stoplight Parrotfish     56      8     0     64
+Other                    61      1     2     64
+Ruler                    29      0     0     29
+Blue Parrotfish           9     18     0     27
+Black Grouper            24      0     0     24
+model: Yellow Anthias     1     19     0     20
+Nassau Grouper           13      0     0     13
+Rainbow Parrotfish       11      0     0     11
+Midnight Parrotfish       4      0     0      4
+Grey Snapper              0      3     0      3
+Fish                      2      0     0      2
+Goliath Grouper           1      1     0      2
+Mutton Snapper            1      0     0      1
+Unidentifiable            1      0     0      1
+Yellowtail Snapper        0      1     0      1
+
+== eligible images by 'measurable' choice
+measurable
+no                            38
+yes, center of fish         1243
+yes, not center of fish       81
+NaN                        23422
+
+== human head-tail length in canvas px
+               count   mean    std    min     5%    50%     95%     max
+environment                                                            
+other         1012.0  535.0  232.0  136.0  265.0  482.0  1010.0  1954.0
+pool           983.0  628.0  458.0   94.0  236.0  543.0  1475.0  3265.0
+reef         22789.0  596.0  369.0   36.0  209.0  500.0  1320.0  3196.0
+
+== already staged (tail_stage log: 1618 ids; species sam_windows log: 339 ids)
+       tail_stage  sam_windows  eligible
+split                                   
+test          906          181      1287
+train           0           15     19980
+val           187            0      3517
+
+== coordinate frame: 1120 frames with a SAM head on the rectified JPEG (human-dot mask)
+            frames  median_pred_shift_px  median_along_ratio  median_obs_offset_px
+bin                                                                               
+(0, 5]        1059                  0.20              -26.37                  9.50
+(5, 10]         11                  5.38               -1.14                 10.38
+(10, 20]         3                 12.81               -0.20                  9.09
+(20, 1000]       2                 40.43               -7.35                369.87
+frames with predicted shift > 5 px: median along-ratio -1.12 (95% bootstrap -148.98..-0.22); 0 = rectified, 1 = raw
+  (heads sit near the principal point, where raw and rectified differ by a few px: this test has little power)
+
+== stakes: % length change if these clicks were raw-frame (undistorted head and tail vs as stored)
+             count  mean   std   min    5%   50%   95%    max
+environment                                                  
+other         1012  0.17  0.27 -0.01  0.03  0.10  0.51   2.87
+pool           983  0.28  0.66  0.01  0.02  0.10  1.21   6.83
+reef         22789  0.26  0.49 -0.02  0.02  0.12  0.91  14.60
+  eligible images without a camera id (not covered): 0

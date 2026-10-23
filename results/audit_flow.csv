@@ -1,0 +1,11 @@
+,n
+images with a head/tail annotation,40446
+ with >=1 unseeded all-manual annotation,25711
+  ... of which also have a seeded/prediction annotation (dropped),0
+  ... of which have no head/tail pixel row (dropped),321
+"  ... of which are non-fish targets (Box, checkerboard; dropped)",606
+"eligible images (unseeded manual, with coordinates)",24784
+ eligible images labelled by >1 annotator,12
+dives with eligible images,182
+images with only empty-result annotations,13001
+  ... of which nonetheless have pixel coords,26

@@ -1,0 +1,23 @@
+species,test,train,val,total
+(no species label),125,19848,3444,23417
+model: Snook,507,12,0,519
+Hogfish,109,22,3,134
+model: Grouper,133,0,0,133
+model: Purple Angel,102,19,0,121
+model: Shark,98,0,0,98
+model: Weasly Fish,0,28,68,96
+Stoplight Parrotfish,56,8,0,64
+Other,61,1,2,64
+Ruler,29,0,0,29
+Blue Parrotfish,9,18,0,27
+Black Grouper,24,0,0,24
+model: Yellow Anthias,1,19,0,20
+Nassau Grouper,13,0,0,13
+Rainbow Parrotfish,11,0,0,11
+Midnight Parrotfish,4,0,0,4
+Grey Snapper,0,3,0,3
+Fish,2,0,0,2
+Goliath Grouper,1,1,0,2
+Mutton Snapper,1,0,0,1
+Unidentifiable,1,0,0,1
+Yellowtail Snapper,0,1,0,1

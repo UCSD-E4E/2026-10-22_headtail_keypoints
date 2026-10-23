@@ -1,0 +1,11 @@
+[project]
+name = "headtail-keypoints"
+version = "0.1.0"
+description = "Snout/fork keypoint detector for FishSense Lite, scored on fish length"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "numpy>=2.3",
+    "pandas>=2.3",
+    "opencv-python-headless>=4.12",
+]
