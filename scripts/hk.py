@@ -1,9 +1,11 @@
 """Shared helpers: paths, crops, keypoint-model inference, and the length metrics.
 
-Crop rule (train and test alike): a square centred on the fish, side = CROP_SCALE x extent +
-CROP_PAD, clipped to the frame. Extent is the human head-tail length when building training crops
-(stage.py) and the diagonal of the SAM 3.1 mask box at test time (the box of the fish under the
-laser dot, as production picks the fish), which is ~1.05-1.1x the length for a fish's aspect.
+Crop rule (train, val and test alike): a square centred on the SAM 3.1 mask box of the fish under the
+laser dot (as production picks the fish), side = BOX_SCALE x box diagonal + CROP_PAD, clipped to the
+frame (crop_from_box). Training frames get their box from SAM run on the stored crop
+(sam_boxes.py --on-crops), which matches the full-window box closely on val (median IoU 0.985).
+Training frames with no human dot or no mask keep the stored click-centred crop
+(square_crop: CROP_SCALE x head-tail length + CROP_PAD).
 """
 from __future__ import annotations
 
@@ -17,19 +19,24 @@ CSCW = Path(os.environ.get("CSCW_REPO", HERE.parent / "cscw-fishsense2027")).res
 DATA = Path(os.environ.get("HEADTAIL_DATA", f"/local/{os.environ.get('USER', 'user')}/headtail_keypoints"))
 STAGE = DATA / "frames"
 YOLO = DATA / "yolo"
-CROP_SCALE, CROP_PAD = 1.6, 128   # stage.py uses the same constants for the training crops
+CROP_SCALE, CROP_PAD = 1.6, 128   # stage.py uses the same constants for the stored training crops
+# Model crops are cut from the SAM 3.1 mask box at every split: side = BOX_SCALE x box diagonal + CROP_PAD.
+# The box diagonal is ~1.1x the head-tail length, so 1.4 keeps the crop inside the stored training crop
+# (1.6 x length + 128) almost always; what falls outside is padded grey.
+BOX_SCALE = 1.4
+PAD_VALUE = 114                    # Ultralytics' letterbox grey
 BODY_HEIGHT = 0.35                 # box height / length for the training box label (the box is not scored)
 
 
-def square_crop(cx: float, cy: float, extent: float, W: int, H: int) -> tuple[int, int, int, int]:
-    half = 0.5 * (CROP_SCALE * extent + CROP_PAD)
+def square_crop(cx: float, cy: float, extent: float, W: int, H: int, scale: float = CROP_SCALE) -> tuple[int, int, int, int]:
+    half = 0.5 * (scale * extent + CROP_PAD)
     x0, y0 = max(0, int(cx - half)), max(0, int(cy - half))
     return x0, y0, min(W, int(np.ceil(cx + half))), min(H, int(np.ceil(cy + half)))
 
 
 def crop_from_box(bbox, W: int, H: int) -> tuple[int, int, int, int]:
     x0, y0, x1, y1 = bbox
-    return square_crop(0.5 * (x0 + x1), 0.5 * (y0 + y1), float(np.hypot(x1 - x0, y1 - y0)), W, H)
+    return square_crop(0.5 * (x0 + x1), 0.5 * (y0 + y1), float(np.hypot(x1 - x0, y1 - y0)), W, H, scale=BOX_SCALE)
 
 
 def box_from_keypoints(hx, hy, tx, ty) -> tuple[float, float, float, float]:

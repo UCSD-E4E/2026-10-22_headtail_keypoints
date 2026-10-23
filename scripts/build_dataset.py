@@ -1,8 +1,11 @@
 """Build the keypoint datasets from the staged frames (CPU).
 
-  train    YOLO-pose images/labels from the staged training crops (<id>.crop.jpg, origin in
-           results/stage_log.jsonl). One fish per crop: box from the clicks (hk.box_from_keypoints),
-           keypoint 0 = snout (human "head"), 1 = fork (human "tail").
+  train    YOLO-pose images/labels. Frames with a SAM 3.1 mask box (results/sam_boxes_crops.jsonl:
+           SAM at the human dot on the stored crop) are cut by the deployment rule (hk.crop_from_box)
+           from the stored crop, grey where the rule reaches past it; the rest keep the stored
+           click-centred crop (<id>.crop.jpg). One fish per crop: box from the clicks
+           (hk.box_from_keypoints), keypoint 0 = snout (human "head"), 1 = fork (human "tail").
+           Writes results/train_crops.csv (source and padded fraction per frame).
   val      the same, from the staged full validation frames, cropped around the clicks the same way.
            Ultralytics' own validation (loss, pose mAP) runs on it; it is only a training monitor.
   sam      crops for the frames that have a SAM 3.1 mask box (results/sam_boxes.jsonl): every val
@@ -16,10 +19,13 @@ Run: uv run python scripts/build_dataset.py train val sam
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
+from pathlib import Path
 
 import cv2
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
@@ -34,28 +40,64 @@ def staged() -> pd.DataFrame:
     return L.drop_duplicates("image_id", keep="last")   # two staging runs overlapped on some frames; same bytes either way
 
 
+def _train_crop(args):
+    """One training image from a SAM box (worker): the deployment crop cut out of the stored crop."""
+    import ctypes
+    ctypes.CDLL(None).prctl(41, 1, 0, 0, 0)   # PR_SET_THP_DISABLE (see stage.py)
+    cv2.setNumThreads(1)
+    iid, box, stored, W, H = args
+    x0, y0, x1, y1 = hk.crop_from_box(box, W, H); sx0, sy0, sx1, sy1 = stored
+    src = cv2.imread(str(hk.STAGE / f"{iid}.crop.jpg"))
+    out = np.full((y1 - y0, x1 - x0, 3), hk.PAD_VALUE, np.uint8)
+    ax0, ay0, ax1, ay1 = max(x0, sx0), max(y0, sy0), min(x1, sx1), min(y1, sy1)
+    if ax1 > ax0 and ay1 > ay0:
+        out[ay0 - y0:ay1 - y0, ax0 - x0:ax1 - x0] = src[ay0 - sy0:ay1 - sy0, ax0 - sx0:ax1 - sx0]
+    cv2.imwrite(str(hk.YOLO / "images" / os.environ.get("TRAIN_DIR", "train") / f"{iid}.jpg"), out)
+    covered = max(0, ax1 - ax0) * max(0, ay1 - ay0) / ((x1 - x0) * (y1 - y0))
+    return iid, (x0, y0, x1, y1), 1.0 - covered
+
+
 def train_val(which: str):
+    from concurrent.futures import ProcessPoolExecutor
+    import multiprocessing as mp
     F = pd.read_csv(hk.HERE / "splits/frames.csv")
     S = staged().set_index("image_id")
     F = F[(F.split == which) & F.image_id.isin(S.index)]
-    img, lab = hk.YOLO / "images" / which, hk.YOLO / "labels" / which
+    sub = os.environ.get("TRAIN_DIR", which) if which == "train" else which   # e.g. TRAIN_DIR=train_sam: build beside a set in use
+    img, lab = hk.YOLO / "images" / sub, hk.YOLO / "labels" / sub
     for d in (img, lab):
         shutil.rmtree(d, ignore_errors=True); d.mkdir(parents=True)
-    n = 0
+    windows, rec = {}, []
+    if which == "train":
+        f = hk.HERE / "results/sam_boxes_crops.jsonl" if os.environ.get("TRAIN_CROPS", "sam") == "sam" else Path("/nonexistent")
+        B = pd.DataFrame([json.loads(l) for l in f.open()]).drop_duplicates("image_id", keep="last") if f.exists() else pd.DataFrame(columns=["image_id", "split", "mask_bbox"])
+        B = B[(B.split == "train") & B.mask_bbox.notna() & B.image_id.isin(F.image_id)]
+        jobs = [(int(r.image_id), r.mask_bbox, tuple(int(S.loc[r.image_id, k]) for k in ("crop_x0", "crop_y0", "crop_x1", "crop_y1")),
+                 int(S.loc[r.image_id, "w"]), int(S.loc[r.image_id, "h"])) for r in B.itertuples()]
+        with ProcessPoolExecutor(16, mp_context=mp.get_context("spawn")) as ex:
+            for iid, win, padded in ex.map(_train_crop, jobs, chunksize=16):
+                windows[iid] = win; rec.append(dict(image_id=iid, source="sam_box", padded=padded))
     for r in F.itertuples():
         s = S.loc[r.image_id]
-        if which == "train":
-            x0, y0 = int(s.crop_x0), int(s.crop_y0); w, h = int(s.crop_x1) - x0, int(s.crop_y1) - y0
+        if r.image_id in windows:
+            x0, y0, x1, y1 = windows[r.image_id]
+        elif which == "train":
+            x0, y0, x1, y1 = int(s.crop_x0), int(s.crop_y0), int(s.crop_x1), int(s.crop_y1)
             (img / f"{r.image_id}.jpg").symlink_to(hk.STAGE / f"{r.image_id}.crop.jpg")
+            rec.append(dict(image_id=r.image_id, source="click", padded=0.0))
         else:
             frame = cv2.imread(str(hk.STAGE / f"{r.image_id}.jpg")); H, W = frame.shape[:2]
             L = ((r.head_x - r.tail_x) ** 2 + (r.head_y - r.tail_y) ** 2) ** 0.5
             x0, y0, x1, y1 = hk.square_crop(0.5 * (r.head_x + r.tail_x), 0.5 * (r.head_y + r.tail_y), L, W, H)
-            w, h = x1 - x0, y1 - y0
             cv2.imwrite(str(img / f"{r.image_id}.jpg"), frame[y0:y1, x0:x1])
+        w, h = x1 - x0, y1 - y0
         (lab / f"{r.image_id}.txt").write_text(hk.yolo_label(w, h, r.head_x - x0, r.head_y - y0, r.tail_x - x0, r.tail_y - y0) + "\n")
-        n += 1
-    print(f"{which}: {n} crops from {F.dive_id.nunique()} dives")
+    msg = f"{which}: {len(F)} crops from {F.dive_id.nunique()} dives"
+    if rec:
+        R = pd.DataFrame(rec); R.to_csv(hk.HERE / f"results/{sub}_crops.csv", index=False, float_format="%.4f")
+        sb = R[R.source == "sam_box"]
+        msg += f"; {len(sb)} cut by SAM box ({(sb.padded > 0).mean():.1%} padded, median pad {sb.padded[sb.padded > 0].median():.1%}), {len(R) - len(sb)} click-centred"
+    print(msg)
 
 
 def _crop_frame(args):
